@@ -51,23 +51,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 detail: selected.currentAddress?.displayValue ?? "Unavailable"))
         menu.addItem(.separator())
 
-        let random = NSMenuItem(title: "Randomize Address",
-                                action: #selector(useRandomAddress), keyEquivalent: "")
-        random.target = self
-        menu.addItem(random)
+        if NetworkInterfaceStore.isSystemManagedWiFi(selected) {
+            let settings = NSMenuItem(title: "Wi-Fi Address Settings…",
+                                      action: #selector(openWiFiAddressSettings),
+                                      keyEquivalent: "")
+            settings.target = self
+            menu.addItem(settings)
+        } else {
+            let random = NSMenuItem(title: "Randomize Address",
+                                    action: #selector(useRandomAddress), keyEquivalent: "")
+            random.target = self
+            menu.addItem(random)
 
-        let custom = NSMenuItem(title: "Set Address…",
-                                action: #selector(enterAddress), keyEquivalent: "e")
-        custom.target = self
-        menu.addItem(custom)
+            let custom = NSMenuItem(title: "Set Address…",
+                                    action: #selector(enterAddress), keyEquivalent: "e")
+            custom.target = self
+            menu.addItem(custom)
 
-        menu.addItem(profilesItem(for: selected))
+            menu.addItem(profilesItem(for: selected))
 
-        let restore = NSMenuItem(title: "Restore Hardware Address",
-                                 action: #selector(restoreHardwareAddress), keyEquivalent: "")
-        restore.target = self
-        restore.isEnabled = selected.currentAddress != selected.hardwareAddress
-        menu.addItem(restore)
+            let restore = NSMenuItem(title: "Restore Hardware Address",
+                                     action: #selector(restoreHardwareAddress), keyEquivalent: "")
+            restore.target = self
+            restore.isEnabled = selected.currentAddress != selected.hardwareAddress
+            menu.addItem(restore)
+        }
 
         menu.addItem(.separator())
         menu.addItem(quitItem)
@@ -149,6 +157,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func selectInterface(_ sender: NSMenuItem) {
         guard let device = sender.representedObject as? String else { return }
         networkStore.select(device: device)
+    }
+
+    @objc private func openWiFiAddressSettings() {
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.wifi-settings-extension") else {
+            return
+        }
+        NSWorkspace.shared.open(url)
     }
 
     @objc private func useRandomAddress() {

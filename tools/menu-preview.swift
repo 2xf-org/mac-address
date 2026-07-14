@@ -68,7 +68,7 @@ func line(_ y: CGFloat) {
     path.stroke()
 }
 
-draw("Wi-Fi (en0)", x: 48, centerY: 416)
+draw("USB Ethernet (en3)", x: 48, centerY: 416)
 draw("›", x: 526, centerY: 416, font: NSFont.systemFont(ofSize: 32, weight: .regular),
      alignment: .right, width: 26)
 

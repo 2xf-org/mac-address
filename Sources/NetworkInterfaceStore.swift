@@ -4,8 +4,10 @@ enum NetworkInterfaceError: LocalizedError {
     case noInterfaces
     case invalidDevice
     case authorizationCancelled
+    case systemManagedWiFi
+    case interfaceRejected(String)
     case commandFailed(String)
-    case addressDidNotChange(expected: HardwareAddress, actual: HardwareAddress?)
+    case addressDidNotChange(String)
 
     var errorDescription: String? {
         switch self {
@@ -15,11 +17,14 @@ enum NetworkInterfaceError: LocalizedError {
             return "The selected network interface is not valid."
         case .authorizationCancelled:
             return "Administrator approval was cancelled."
+        case .systemManagedWiFi:
+            return "This version of macOS manages Wi-Fi addresses. Use Wi-Fi Address Settings to choose Fixed or Rotating, or select a supported Ethernet interface."
+        case .interfaceRejected(let name):
+            return "The driver for \(name) rejected the change. This adapter may not support custom MAC addresses."
         case .commandFailed(let message):
             return message.isEmpty ? "macOS could not update this interface." : message
-        case .addressDidNotChange(let expected, let actual):
-            let actualText = actual?.displayValue ?? "unknown"
-            return "The interface still reports \(actualText), not \(expected.displayValue). Its driver may not support changing the MAC address."
+        case .addressDidNotChange(let name):
+            return "The driver for \(name) did not keep the requested address."
         }
     }
 }
@@ -83,6 +88,9 @@ final class NetworkInterfaceStore {
         guard Self.isSafeDeviceName(interface.device) else {
             throw NetworkInterfaceError.invalidDevice
         }
+        guard !Self.isSystemManagedWiFi(interface) else {
+            throw NetworkInterfaceError.systemManagedWiFi
+        }
 
         let command = "/sbin/ifconfig \(interface.device) ether \(address.value)"
         let script = "do shell script \"\(Self.escapeForAppleScript(command))\" with administrator privileges"
@@ -93,15 +101,27 @@ final class NetworkInterfaceStore {
             if error.output.contains("(-128)") || error.output.localizedCaseInsensitiveContains("cancel") {
                 throw NetworkInterfaceError.authorizationCancelled
             }
-            throw NetworkInterfaceError.commandFailed(Self.cleanCommandError(error.output))
+            let message = Self.cleanCommandError(error.output)
+            if message.localizedCaseInsensitiveContains("SIOCAIFADDR")
+                || message.localizedCaseInsensitiveContains("can't assign requested address") {
+                throw NetworkInterfaceError.interfaceRejected(interface.displayName)
+            }
+            throw NetworkInterfaceError.commandFailed(message)
         }
 
         try reload()
         let actual = self.interface(device: interface.device)?.currentAddress
         guard actual == address else {
-            throw NetworkInterfaceError.addressDidNotChange(expected: address, actual: actual)
+            throw NetworkInterfaceError.addressDidNotChange(interface.displayName)
         }
         select(device: interface.device)
+    }
+
+    static func isSystemManagedWiFi(
+        _ interface: NetworkInterface,
+        osMajorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
+    ) -> Bool {
+        interface.hardwarePort == "Wi-Fi" && osMajorVersion >= 15
     }
 
     static func parseHardwarePorts(_ output: String) -> [NetworkInterface] {
@@ -172,9 +192,12 @@ final class NetworkInterfaceStore {
             .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
-    private static func cleanCommandError(_ output: String) -> String {
+    static func cleanCommandError(_ output: String) -> String {
         output
             .replacingOccurrences(of: "execution error: ", with: "")
+            .replacingOccurrences(of: #"^\d+:\d+:\s*"#,
+                                  with: "",
+                                  options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

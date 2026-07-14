@@ -6,6 +6,8 @@ struct ModelTests {
         try testHardwareAddresses()
         try testHardwarePortParsing()
         try testInterfaceStateParsing()
+        try testInterfaceSupport()
+        try testCommandErrorCleanup()
         try testProfiles()
         print("✓ All model tests passed")
     }
@@ -56,6 +58,29 @@ struct ModelTests {
         """)
         expect(state.address?.value == "02:ab:cd:ef:12:34")
         expect(state.isActive)
+    }
+
+    private static func testInterfaceSupport() throws {
+        let wifi = NetworkInterface(hardwarePort: "Wi-Fi",
+                                    device: "en0",
+                                    hardwareAddress: HardwareAddress("aa:bb:cc:dd:ee:00")!,
+                                    currentAddress: nil,
+                                    isActive: true)
+        let ethernet = NetworkInterface(hardwarePort: "USB Ethernet",
+                                        device: "en7",
+                                        hardwareAddress: HardwareAddress("02:11:22:33:44:55")!,
+                                        currentAddress: nil,
+                                        isActive: false)
+        expect(NetworkInterfaceStore.isSystemManagedWiFi(wifi, osMajorVersion: 26))
+        expect(!NetworkInterfaceStore.isSystemManagedWiFi(wifi, osMajorVersion: 14))
+        expect(!NetworkInterfaceStore.isSystemManagedWiFi(ethernet, osMajorVersion: 26))
+    }
+
+    private static func testCommandErrorCleanup() throws {
+        let raw = "0:90: execution error: ifconfig: ioctl (SIOCAIFADDR): Can't assign requested address (1)\n"
+        let cleaned = NetworkInterfaceStore.cleanCommandError(raw)
+        expect(!cleaned.hasPrefix("0:90:"))
+        expect(cleaned.hasPrefix("ifconfig:"))
     }
 
     private static func testProfiles() throws {
