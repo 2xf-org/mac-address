@@ -4,10 +4,10 @@ enum NetworkInterfaceError: LocalizedError {
     case noInterfaces
     case invalidDevice
     case authorizationCancelled
-    case systemManagedWiFi
     case interfaceRejected(String)
     case commandFailed(String)
     case addressDidNotChange(String)
+    case wifiAddressDidNotStick
 
     var errorDescription: String? {
         switch self {
@@ -17,14 +17,14 @@ enum NetworkInterfaceError: LocalizedError {
             return "The selected network interface is not valid."
         case .authorizationCancelled:
             return "Administrator approval was cancelled."
-        case .systemManagedWiFi:
-            return "This version of macOS manages Wi-Fi addresses. Use Wi-Fi Address Settings to choose Fixed or Rotating, or select a supported Ethernet interface."
         case .interfaceRejected(let name):
             return "The driver for \(name) rejected the change. This adapter may not support custom MAC addresses."
         case .commandFailed(let message):
             return message.isEmpty ? "macOS could not update this interface." : message
         case .addressDidNotChange(let name):
             return "The driver for \(name) did not keep the requested address."
+        case .wifiAddressDidNotStick:
+            return "macOS replaced the address while Wi-Fi reconnected. Set Private Wi-Fi Address to Off in Wi-Fi Address Settings, then try again."
         }
     }
 }
@@ -88,11 +88,8 @@ final class NetworkInterfaceStore {
         guard Self.isSafeDeviceName(interface.device) else {
             throw NetworkInterfaceError.invalidDevice
         }
-        guard !Self.isSystemManagedWiFi(interface) else {
-            throw NetworkInterfaceError.systemManagedWiFi
-        }
 
-        let command = "/sbin/ifconfig \(interface.device) ether \(address.value)"
+        let command = Self.privilegedCommand(address: address, interface: interface)
         let script = "do shell script \"\(Self.escapeForAppleScript(command))\" with administrator privileges"
 
         do {
@@ -109,19 +106,47 @@ final class NetworkInterfaceStore {
             throw NetworkInterfaceError.commandFailed(message)
         }
 
-        try reload()
+        if Self.isWiFi(interface), interface.isActive {
+            // The power cycle returns before association completes. Wait briefly
+            // so verification sees the address macOS actually uses after reconnecting.
+            for _ in 0..<10 {
+                Thread.sleep(forTimeInterval: 0.5)
+                try reload()
+                if self.interface(device: interface.device)?.isActive == true {
+                    break
+                }
+            }
+        } else {
+            try reload()
+        }
+
         let actual = self.interface(device: interface.device)?.currentAddress
         guard actual == address else {
+            if Self.isWiFi(interface) {
+                throw NetworkInterfaceError.wifiAddressDidNotStick
+            }
             throw NetworkInterfaceError.addressDidNotChange(interface.displayName)
         }
         select(device: interface.device)
     }
 
-    static func isSystemManagedWiFi(
-        _ interface: NetworkInterface,
-        osMajorVersion: Int = ProcessInfo.processInfo.operatingSystemVersion.majorVersion
-    ) -> Bool {
-        interface.hardwarePort == "Wi-Fi" && osMajorVersion >= 15
+    static func isWiFi(_ interface: NetworkInterface) -> Bool {
+        interface.hardwarePort == "Wi-Fi"
+    }
+
+    static func privilegedCommand(address: HardwareAddress,
+                                  interface: NetworkInterface) -> String {
+        let setAddress = "/sbin/ifconfig \(interface.device) ether \(address.value)"
+        guard isWiFi(interface) else { return setAddress }
+
+        // A connected Apple Wi-Fi driver rejects SIOCAIFADDR. Power-cycling
+        // disassociates it, and the address must be set immediately after power-on,
+        // before macOS rejoins a preferred network.
+        return [
+            "/usr/sbin/networksetup -setairportpower \(interface.device) off",
+            "/usr/sbin/networksetup -setairportpower \(interface.device) on",
+            setAddress,
+        ].joined(separator: " && ")
     }
 
     static func parseHardwarePorts(_ output: String) -> [NetworkInterface] {

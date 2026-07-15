@@ -51,30 +51,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 detail: selected.currentAddress?.displayValue ?? "Unavailable"))
         menu.addItem(.separator())
 
-        if NetworkInterfaceStore.isSystemManagedWiFi(selected) {
-            let settings = NSMenuItem(title: "Wi-Fi Address Settings…",
+        let random = NSMenuItem(title: "Randomize Address",
+                                action: #selector(useRandomAddress), keyEquivalent: "")
+        random.target = self
+        menu.addItem(random)
+
+        let custom = NSMenuItem(title: "Set Address…",
+                                action: #selector(enterAddress), keyEquivalent: "e")
+        custom.target = self
+        menu.addItem(custom)
+
+        menu.addItem(profilesItem(for: selected))
+
+        let restore = NSMenuItem(title: "Restore Hardware Address",
+                                 action: #selector(restoreHardwareAddress), keyEquivalent: "")
+        restore.target = self
+        restore.isEnabled = selected.currentAddress != selected.hardwareAddress
+        menu.addItem(restore)
+
+        if NetworkInterfaceStore.isWiFi(selected) {
+            let settings = NSMenuItem(title: "Private Wi-Fi Settings…",
                                       action: #selector(openWiFiAddressSettings),
                                       keyEquivalent: "")
             settings.target = self
             menu.addItem(settings)
-        } else {
-            let random = NSMenuItem(title: "Randomize Address",
-                                    action: #selector(useRandomAddress), keyEquivalent: "")
-            random.target = self
-            menu.addItem(random)
-
-            let custom = NSMenuItem(title: "Set Address…",
-                                    action: #selector(enterAddress), keyEquivalent: "e")
-            custom.target = self
-            menu.addItem(custom)
-
-            menu.addItem(profilesItem(for: selected))
-
-            let restore = NSMenuItem(title: "Restore Hardware Address",
-                                     action: #selector(restoreHardwareAddress), keyEquivalent: "")
-            restore.target = self
-            restore.isEnabled = selected.currentAddress != selected.hardwareAddress
-            menu.addItem(restore)
         }
 
         menu.addItem(.separator())

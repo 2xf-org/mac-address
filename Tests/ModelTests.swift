@@ -6,7 +6,7 @@ struct ModelTests {
         try testHardwareAddresses()
         try testHardwarePortParsing()
         try testInterfaceStateParsing()
-        try testInterfaceSupport()
+        try testPrivilegedCommands()
         try testCommandErrorCleanup()
         try testProfiles()
         print("✓ All model tests passed")
@@ -60,7 +60,7 @@ struct ModelTests {
         expect(state.isActive)
     }
 
-    private static func testInterfaceSupport() throws {
+    private static func testPrivilegedCommands() throws {
         let wifi = NetworkInterface(hardwarePort: "Wi-Fi",
                                     device: "en0",
                                     hardwareAddress: HardwareAddress("aa:bb:cc:dd:ee:00")!,
@@ -71,9 +71,17 @@ struct ModelTests {
                                         hardwareAddress: HardwareAddress("02:11:22:33:44:55")!,
                                         currentAddress: nil,
                                         isActive: false)
-        expect(NetworkInterfaceStore.isSystemManagedWiFi(wifi, osMajorVersion: 26))
-        expect(!NetworkInterfaceStore.isSystemManagedWiFi(wifi, osMajorVersion: 14))
-        expect(!NetworkInterfaceStore.isSystemManagedWiFi(ethernet, osMajorVersion: 26))
+        let address = HardwareAddress("02:aa:bb:cc:dd:ee")!
+        let wifiCommand = NetworkInterfaceStore.privilegedCommand(address: address,
+                                                                  interface: wifi)
+        let ethernetCommand = NetworkInterfaceStore.privilegedCommand(address: address,
+                                                                      interface: ethernet)
+
+        expect(NetworkInterfaceStore.isWiFi(wifi))
+        expect(!NetworkInterfaceStore.isWiFi(ethernet))
+        expect(wifiCommand == "/usr/sbin/networksetup -setairportpower en0 off && /usr/sbin/networksetup -setairportpower en0 on && /sbin/ifconfig en0 ether 02:aa:bb:cc:dd:ee")
+        expect(!wifiCommand.contains("Apple80211"))
+        expect(ethernetCommand == "/sbin/ifconfig en7 ether 02:aa:bb:cc:dd:ee")
     }
 
     private static func testCommandErrorCleanup() throws {

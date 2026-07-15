@@ -8,11 +8,11 @@ guard args.count == 2 else {
     exit(1)
 }
 
-let size = NSSize(width: 598, height: 470)
+let size = NSSize(width: 598, height: 520)
 let image = NSImage(size: size)
 image.lockFocus()
 
-let rect = NSRect(x: 14, y: 14, width: 570, height: 442)
+let rect = NSRect(x: 14, y: 14, width: 570, height: 492)
 let panel = NSBezierPath(roundedRect: rect, xRadius: 20, yRadius: 20)
 
 NSGraphicsContext.saveGraphicsState()
@@ -68,23 +68,24 @@ func line(_ y: CGFloat) {
     path.stroke()
 }
 
-draw("USB Ethernet (en3)", x: 48, centerY: 416)
-draw("›", x: 526, centerY: 416, font: NSFont.systemFont(ofSize: 32, weight: .regular),
+draw("Wi-Fi (en0)", x: 48, centerY: 466)
+draw("›", x: 526, centerY: 466, font: NSFont.systemFont(ofSize: 32, weight: .regular),
      alignment: .right, width: 26)
 
-draw("Current", x: 48, centerY: 364, color: secondary)
-draw(exampleAddress, x: 252, centerY: 364, color: secondary,
+draw("Current", x: 48, centerY: 414, color: secondary)
+draw(exampleAddress, x: 252, centerY: 414, color: secondary,
      font: detailFont, alignment: .right, width: 300)
 
-line(328)
+line(378)
 
-draw("Randomize Address", x: 48, centerY: 294)
-draw("Set Address…", x: 48, centerY: 244)
-draw("⌘ E", x: 472, centerY: 244, color: secondary, alignment: .right, width: 80)
-draw("Profiles", x: 48, centerY: 194)
-draw("›", x: 526, centerY: 194, font: NSFont.systemFont(ofSize: 32, weight: .regular),
+draw("Randomize Address", x: 48, centerY: 344)
+draw("Set Address…", x: 48, centerY: 294)
+draw("⌘ E", x: 472, centerY: 294, color: secondary, alignment: .right, width: 80)
+draw("Profiles", x: 48, centerY: 244)
+draw("›", x: 526, centerY: 244, font: NSFont.systemFont(ofSize: 32, weight: .regular),
      alignment: .right, width: 26)
-draw("Restore Hardware Address", x: 48, centerY: 144)
+draw("Restore Hardware Address", x: 48, centerY: 194)
+draw("Private Wi-Fi Settings…", x: 48, centerY: 144)
 
 line(108)
 

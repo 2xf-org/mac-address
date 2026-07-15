@@ -48,23 +48,32 @@ To keep it around, move `MAC Address.app` to `/Applications` and add it to
   delete it without changing the active address.
 - **Restore Hardware Address**: return the selected interface to the address
   reported by macOS for that hardware port.
-- **Wi-Fi Address Settings…**: on current macOS versions, open Apple's per-network
+- **Private Wi-Fi Settings…**: on current macOS versions, open Apple's per-network
   **Off**, **Fixed**, and **Rotating** Private Wi-Fi Address controls.
 
 macOS asks for administrator approval whenever an address is changed. The
-interface may disconnect briefly while its hardware filter is reprogrammed.
+interface may disconnect briefly while its hardware filter is reprogrammed. For
+Wi-Fi, MAC Address powers the interface off and back on, sets the address before
+it reassociates, and then lets it reconnect automatically.
 
 ## How it works
 
 The app reads hardware ports with `networksetup`, reads live addresses with
-`ifconfig`, and uses macOS's standard administrator prompt to run one validated
-`ifconfig <device> ether <address>` command on driver-supported interfaces.
-Interface names come from macOS and are restricted to safe device characters;
-addresses are parsed and normalized before the privileged command is created.
+`ifconfig`, and uses macOS's standard administrator prompt to run a validated
+address-change sequence. Interface names come from macOS and are restricted to
+safe device characters; addresses are parsed and normalized before the
+privileged command is created.
 
-Starting with macOS Sequoia 15, Wi-Fi addresses are managed per network by
-macOS. MAC Address links directly to those settings instead of attempting a
-command the Wi-Fi driver will reject. See Apple's guide to
+Apple's Wi-Fi driver rejects `ifconfig` while it is associated with a network.
+MAC Address follows the established approach used by
+[`spoof`](https://github.com/feross/spoof): disassociate first, apply the address,
+then reconnect. Tahoe no longer includes the private `airport -z` helper used by
+older tools, so MAC Address creates the same disassociated window with
+`networksetup -setairportpower`.
+
+Starting with macOS Sequoia 15, Private Wi-Fi Address may replace a custom
+address when Wi-Fi reconnects. If that happens, choose **Off** for the current
+network before applying the custom address. See Apple's guide to
 [Private Wi-Fi Address](https://support.apple.com/en-us/102509).
 
 Profiles stay local at:
